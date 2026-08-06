@@ -1,0 +1,90 @@
+# Tech Lead — état courant
+
+Voir [`role.md`](role.md) pour la mission et les repères. Ce fichier doit être mis à jour en continu, pas seulement en fin de session (voir [`_conventions.md`](../_conventions.md)).
+
+## Fait
+
+- 2026-07-27 — Release 1.5.0 : commits développe → bundle version 1.5.0 → push staging (2 repos à la fois) → CI vérifiée → tag `1.5.0` sur les 7 repos concernés (admin-service, baker-service, display-service, order-service, review-service, user-service, Patisry). Détail dans `Documentations/devops/state.md`.
+
+- 2026-08-04 — **PAT-24 (optimisation des images) — Phase 1 livrée sur dev (Freebox), ticket Linear passé en "In Review".**
+  - Audit du pipeline complet fait avant toute décision : aucun traitement d'image nulle part (pas de resize/compression, colonnes DB `width_pixels`/`height_pixels`/`file_size_bytes` existantes mais jamais remplies, aucune variante de taille).
+  - Plan validé avec le CTO (`/Users/anzembani/.claude/plans/fuzzy-doodling-cupcake.md`) — scope étendu à `display-service` en cours de plan après vérification que ses `jsonb_build_object` SQL bruts n'auraient sinon jamais exposé les nouvelles colonnes (le CTO avait raison de le demander explicitement).
+  - Délégation Full-stack → DevOps → QA → Full-stack (fix ciblé) suivie de bout en bout, avec revue personnelle à chaque étape (pas seulement lecture des rapports) :
+    - Full-stack : Pillow à l'upload sur `product-service`/`baker-service` (3 variantes produit, 2 variantes avatar), exposition additive dans `display-service`, script SQL. Revue perso : correction d'un champ `format` resté incohérent (toujours dérivé du fichier d'origine alors que la sortie est désormais systématiquement JPEG).
+    - DevOps : agent automatique lancé en premier s'est bloqué (timeout 600s, hypothèse fausse sur un conteneur `patisry-db` qui n'existe pas sur la Freebox — Postgres y tourne en natif/systemd). Repris et terminé en direct : SQL appliqué sur les 2 bases Freebox (`mytestpatisry` + `test_mytestpatisry`), 3 services déployés.
+    - **Incident en cours de déploiement, résolu en direct** : `deploy_freebox.sh` a écrasé un `.env` fonctionnel avec la version versionnée du repo, qui n'a jamais eu `JWT_SECRET_KEY` pour ces 3 services (trou pré-existant, sans lien avec PAT-24) → 3 services en crash-loop. Accord explicite demandé au CTO avant de toucher au secret partagé, puis correctif appliqué (3 `.env.freebox` + recréation propre des conteneurs, en évitant un bug connu de `docker-compose --force-recreate` sur cette Freebox). Détail complet et pièges documentés dans `devops/state.md` et `devops/role.md` pour éviter la récidive.
+    - QA : 16 échecs de tests directement liés au changement de contrat identifiés avec précision (2 product-service, 14 baker-service), 12 échecs confirmés préexistants et non liés (via `git diff`) laissés intacts.
+    - Full-stack (fix ciblé) : les 16 tests corrigés, strictement dans leur périmètre (aucun code de prod touché). baker-service 70/70. product-service 57/68 — 1 test reste en échec au-delà des 10 préexistants documentés, pour une raison préexistante elle aussi (bug de mock `ProductUser`/permission, sans rapport avec Pillow), volontairement non poursuivi.
+  - **Vérification finale personnelle** : la vraie photo HD du repo (`gateau_fraise.jpg`, 5008 KB) traitée en direct dans le conteneur `product-service` réellement déployé → 159 KB (main, -97%), 47 KB (medium), 9 KB (thumbnail).
+  - Ticket Linear PAT-24 passé en "In Review" avec commentaire de synthèse complet.
+
+## En cours
+
+_Rien pour l'instant._
+
+- 2026-08-04 — **PAT-24 Phase 2 (cache + CDN) livrée en local, commitée sur `develop` dans les 3 repos, PAS poussée sur le remote.**
+  - `product-service` : ETag + `Cache-Control: public, max-age=3600` sur `retrieve_image` (pas d'`immutable` : `update_images` peut remplacer les octets sous la même clé). Vérifié : 0 régression (toujours exactement les 10 échecs préexistants).
+  - `baker-service` : `AWS_S3_CUSTOM_DOMAIN` câblé (délégué à Full-stack) — bascule les URLs publiques sur le domaine CDN Scaleway Edge Services quand défini (convention django-storages, bucket absent du chemin), `delete_baker_image` reconnaît les deux formes d'URL. CDN activé côté utilisateur : `e4912263-810a-4965-a64b-ec08299228d2.svc.edge.scw.cloud` (à renseigner en `AWS_S3_CUSTOM_DOMAIN` sur `/opt/patisry/.env` staging quand ce déploiement sera fait — pas fait aujourd'hui). 74/74 tests verts.
+  - **Limite architecturale clarifiée avec le CTO** : le CDN ne peut bénéficier qu'à `baker-service` (URLs S3 directes) — `product-service` proxifie toujours via Django (`retrieve_image`), donc aucun gain CDN pour les images produit tant que l'unification du stockage (différée en Phase 1) n'est pas faite. `display-service` ne sert jamais d'octets d'image (JSON only) — n'est concerné ni par la compression ni par le CDN, contrairement à ce qu'on pouvait supposer.
+  - **CTO a indiqué** : l'unification de stockage product-service devient la priorité suivante, une fois cette tâche terminée.
+  - **Piège git découvert et traité** : `baker-service/.gitignore` exclut tout le dossier `baker_app/` — même les fichiers déjà trackés refusent un `git add` normal (git récent). Sans `git add -f`, la quasi-totalité du diff PAT-24 de baker-service aurait été silencieusement absente de tout commit (fonctionnerait quand même sur Freebox via `rsync`, casserait un build CI staging depuis un clone frais). Vérifié fichier par fichier avant de committer.
+  - Commits de code faits par moi directement (git add/commit) plutôt que délégués — trop de subtilités spécifiques (gitignore, exclusion `.env.freebox`/`media/`) pour un agent sans ce contexte accumulé. Implémentation du code déléguée à Full-stack pour préserver le contexte, comme demandé par le CTO.
+  - `.env.freebox` (correctif JWT_SECRET_KEY) commité séparément sur les 3 repos après confirmation explicite du CTO (bloqué une première fois par le classificateur de permissions, secret partagé).
+
+- 2026-08-04/05 — **PAT-24 suite : unification du stockage product-service sur le modèle baker-service, commitée sur `develop`, PAS poussée.**
+  - Audit préalable (délégué) : seuls `product-service`/`display-service` lisent réellement `product_image` (un modèle fantôme inutilisé traîne dans `auth-service`) ; l'app Flutter tolère déjà un mélange clé-brute/URL-absolue grâce à sa logique de normalisation existante — zéro changement Flutter nécessaire, confirmé avant d'implémenter.
+  - `product_image.imageurl`/`thumbnail_url`/`medium_url` stockent désormais une URL absolue calculée une fois à l'upload (`build_public_url()`, miroir exact de la logique CDN de baker-service), avec garde de rétrocompatibilité (`startswith('http')`) partout où une reconstruction d'URL existait (serializer, `retrieve_full_product`, action `product_image` de display-service) pour ne pas casser les lignes déjà en base.
+  - Déploiement Freebox : **1er essai interrompu par une coupure SSH en plein transfert** — l'exit code réussi ne reflétait pas la réalité (conteneur jamais redémarré). Vérifié activement plutôt que supposé, redéployé proprement, confirmé stable.
+  - QA : 63/73 (product-service) et 36/38 (display-service), exactement les échecs préexistants déjà documentés, zéro régression. `integration_tests.py` bloqué par un throttle pré-existant sur `/api/auth/login/` (10/min, `SECURITY_HARDENING_TICKET.md`) — non lié à ce changement, non contourné pour ne pas prolonger un lockout IP partagé sur la Freebox.
+  - **Vérification finale personnelle en conditions réelles** : `build_public_url()` exécuté dans le conteneur déployé confirme `http://91.171.4.184:28006/api/products/images/<clé>` ; l'action `product_image` de display-service testée en direct (`curl`) sur plusieurs vrais produits confirme la rétrocompatibilité (anciennes lignes en clé brute correctement reconstruites) ; l'image récupérée confirme ETag + `Cache-Control` actifs (Phase 2).
+  - Commits faits par moi directement (pas de piège gitignore cette fois, vérifié avant de committer).
+
+- 2026-08-05 — **`put_object` confirmé fonctionnel contre le vrai bucket Scaleway staging (`patisry-staging-media`)**, plus de doute. Accès obtenu via `ssh -i ~/.ssh/patisry-staging-deploy ubuntu@51.15.236.77` (agent 1Password sur la clé "Scaleway" échoue systématiquement en non-interactif — `sign_and_send_pubkey: signing failed`, mais SSH retombe ensuite sur la clé fichier explicite et réussit ; prévoir un timeout long, ~90s, pour laisser le fallback se faire). Test réel dans le conteneur `patisry-baker` (credentials déjà chargés en env, jamais extraites de ce contexte) : `put_object(ACL='public-read', ContentType=...)` → objet créé, **fetché avec succès en HTTP public sans aucune auth** (`curl` direct depuis l'extérieur), puis supprimé et absence confirmée (404). Aucun test artefact laissé sur le bucket.
+
+- 2026-08-05 — **PAT-24 Phase 3 (consommation Flutter des variantes) livrée, commitée et poussée sur `develop`.**
+  - Audit exhaustif préalable (délégué, 2 passes Explore) : 21 emplacements d'affichage recensés (11 thumbnail, 5 medium, 1 main inchangé), confirmé qu'aucun changement backend n'était nécessaire — tout était déjà exposé par les API depuis les Phases 1-2.
+  - Plan formel validé (EnterPlanMode) avant implémentation, délégation Full-stack pour le gros œuvre (26 fichiers, modèles + datasources + 21 widgets), avec un écart légitime tranché seul par l'agent (extension de `favorites_service.dart`, non prévu au plan mais nécessaire — `FavoriteItem`/`_FavoriteUiData` n'avaient aucun champ thumbnail/medium).
+  - Revue personnelle du diff (modèles, migration du cache `DisplayApi` vers un record Dart, extension `favorites_service.dart`) : correcte, cohérente, additive partout.
+  - `flutter analyze`/`flutter build web` re-vérifiés indépendamment (pas seulement le rapport de l'agent) : 0 erreur, build vert.
+  - **Vérification live en conditions réelles** : les outils de capture réseau du navigateur ne captent pas les images rendues par Flutter Web/CanvasKit (confirmé après plusieurs tentatives) — vérification faite via les logs d'accès réels de `product-service` sur la Freebox à la place, plus fiable. Un produit existant (261) retraité en direct via le vrai code (`process_image`/`build_public_url`, pas le script de backfill lui-même, non exécuté comme convenu) pour avoir un exemple réel de ligne au nouveau format. Confirmé : `GET .../scaled_20240505_163742_medium.jpg` → `200, 43039 octets`, demandé par un vrai client (dont un appareil Android réel, pas seulement mon propre onglet de test) — la chaîne complète (modèle → datasource → normalisation → backend → fetch réel) fonctionne de bout en bout.
+  - Ticket PAT-30 ouvert en parallèle pour le code mort repéré pendant l'audit (`cart_card.dart`/`order_item_card.dart`, jamais utilisés).
+
+- 2026-08-05 — **PAT-24 déployé sur staging (`stg.patisry.fr`), les 4 repos (product-service, baker-service, display-service, Patisry).**
+  - SQL appliqué sur la DB staging (`patisry-db`, user réel `patisry_backend` — **pas** `patisry_admin` comme documenté dans `CLAUDE.md`, à corriger) : 3 colonnes confirmées présentes avant tout déploiement de code, pour éviter l'incident du type Freebox.
+  - `AWS_S3_CUSTOM_DOMAIN` corrigé : pointait sur le bucket direct (`patisry-staging-media.s3.fr-par.scw.cloud`), changé pour le vrai domaine CDN Edge Services (`e4912263-810a-4965-a64b-ec08299228d2.svc.edge.scw.cloud`) donné par le CTO — vérifié fonctionnel (`curl` direct, 200).
+  - Merge develop→staging fait 2 repos à la fois comme prescrit : (product-service + baker-service) puis (display-service + Patisry).
+  - **Incident mineur en route** : le déploiement `baker-service` a échoué au 1er essai (`failed to extract layer... UtimesNanoAt`, panne containerd transitoire côté VM staging, disque OK à 33% d'usage — pas un problème de code). L'ancien conteneur est resté up sans interruption pendant l'échec. `gh run rerun` a suffi, succès au 2ᵉ essai.
+  - Tous les conteneurs vérifiés stables après coup (aucun crash-loop, contrairement à Freebox — le schéma était déjà appliqué avant le déploiement du code cette fois).
+  - **Vérification frontend + images en conditions réelles** : `stg.patisry.fr` chargé, données réelles (vraies photos de gâteaux, pas des données de test), 0 erreur console. Logs serveur `patisry-product` confirmés : images bien servies (200 OK), `ETag`/`Cache-Control: public, max-age=3600` actifs. Images encore au format pré-PAT-24 (pas de suffixe `_medium`/`_thumb`) — **attendu**, le script de backfill (`reprocess_images`, déjà écrit et testé en syntaxe uniquement) n'a pas encore été lancé sur staging, à faire séparément quand le CTO le demandera.
+
+- 2026-08-05 — **Backfill des images staging exécuté pour de vrai** (après dry-run vérifié en détail avec le CTO — comportement confirmé différent entre les 2 services : product-service écrase en place à la même clé, baker-service copie sous nouvel UUID puis supprime l'ancienne image après succès).
+  - `reprocess_images` product-service : 33/33 images traitées, 0 échec. Vérifié en base : 33/33 en URL absolue, 33/33 avec thumbnail.
+  - `reprocess_images` baker-service : 1/1 avatar traité. Vérifié : nouvelle image accessible (200), ancienne bien supprimée (404).
+  - **Découverte positive en vérifiant** : les nouvelles URLs product-service pointent directement sur le CDN (`https://e4912263-....svc.edge.scw.cloud/...`), pas sur le proxy Django (`/api/products/images/...`) — confirme que l'unification de stockage + CDN fonctionne bout en bout en conditions réelles pour les images produit, pas seulement en théorie. Vérifié par `curl` direct : 200, taille réduite (~50 Ko pour un medium contre ~1 Mo avant), `x-cache`/`age` présents (mise en cache CDN active).
+  - Note opérationnelle : les commandes SSH staging timeout parfois côté client (~120s) alors que la commande a bien fini côté serveur (le premier run product-service en est un exemple) — toujours revérifier l'état réel (DB, logs) après un timeout apparent, ne pas relancer aveuglément une commande non-idempotente sans vérifier d'abord.
+  - Correction documentaire : `CLAUDE.md` corrigé (utilisateur DB staging réel `patisry_backend`, pas `patisry_admin`).
+
+- 2026-08-05 — **Bug CORS trouvé et corrigé sur `patisry.fr`** (signalé par le CTO, pas détecté par moi — je n'avais vérifié que `stg.patisry.fr`).
+  - Découverte en creusant : `patisry.fr` **n'est plus un domaine parké** (contrairement à ce que documentaient `devops/role.md`, `devops/solution.md`, `tech-lead/solution.md` depuis le 2026-07-27) — son DNS pointe désormais vers la VM staging (`51.15.236.77`), confirmé indépendamment (`dig`, `curl` hors navigateur). Cause du changement DNS non documentée, à clarifier — les 3 fichiers corrigés pour refléter l'état réel sans supposer l'intention.
+  - Root cause : `terraform/patisry-infra/Scaleway/storage.tf` n'autorisait que `https://stg.patisry.fr` en CORS sur le bucket média — `patisry.fr` bloqué par le navigateur (confirmé par `curl -H "Origin: ..."` : headers CORS présents pour l'un, absents pour l'autre).
+  - Fix : `patisry.fr`/`www.patisry.fr` ajoutés à `allowed_origins`. Bloqué une première fois par une clé API Scaleway expirée (locale, `~/.config/scw/config.yaml` — terraform et `scw` CLI partagent le même profil, pas de clé en dur dans `main.tf`) ; CTO a régénéré la clé, `terraform plan` (1 to change, 0 destroy) puis `apply` refaits proprement. Vérifié en direct : `access-control-allow-origin: https://patisry.fr` présent, images confirmées chargées sur le vrai site.
+
+## Prochaine étape identifiée avec le CTO
+
+Le CDN Scaleway ne bénéficiait qu'à `baker-service` avant cette tâche (product-service proxifiait toujours via Django). Avec l'unification faite, **product-service peut maintenant, lui aussi, servir des URLs S3/CDN directes dès que le stockage S3 est actif** (même mécanisme `AWS_S3_CUSTOM_DOMAIN` que baker-service, déjà câblé). Reste à faire, hors scope aujourd'hui : déploiement staging (schéma déjà compatible, pas de migration DB requise pour cette tâche) + vérification réelle du CDN sur les images produit une fois là-bas.
+
+## Bloqué / n'a pas pu être fait correctement
+
+_Rien pour l'instant._
+
+## Questions ouvertes pour le CTO
+
+- **PAT-24 reste en "In Review", pas "Done"** : Phase 1 validée sur dev (Freebox) uniquement, pas encore sur staging (règle projet : "une feature n'est livrée que validée sur staging"). Prioriser le déploiement staging maintenant, ou attendre le prochain cycle de release groupé ?
+- Une découverte hors scope pendant PAT-24, encore ouverte :
+  1. `baker-service` : `_save_s3()` utilise `put_object` (jamais testé qu'en mock) au lieu de l'ancien `upload_fileobj`/`ExtraArgs` — à vérifier contre Scaleway Object Storage réel avant tout déploiement staging de ce service.
+
+- ~~`product-service` : bug `ProductUser`/mock sur `test_create_images_success`~~ — **résolu le 2026-08-04**, hors de cette session : l'utilisateur a lancé par erreur le worktree suggéré par le chip de suivi, qui a ajouté le mock `ProductUser` manquant. Vérifié par moi-même après coup (suite complète relancée) : `product-service` passe maintenant à **58/68**, exactement les 10 échecs préexistants documentés restants, zéro échec lié à PAT-24. Meilleur état que celui laissé en fin de tâche initiale (57/68).
+
+## Dernière mise à jour
+
+2026-08-04 — PAT-24 Phase 1 livrée sur dev (Freebox), incident de déploiement résolu, tests verts (hors échecs préexistants documentés), ticket Linear en "In Review".

@@ -1,0 +1,9 @@
+- TODO: add real time push from all services
+- TODO: add notification event to the frontend 
+- TODO: ajouter les informations présent dans pas la page modification de produit dynamique 
+- TODO: Integration stripe
+- TDOD: Integration google maps autocompletion 
+- TODO: Implementation of messages
+- TODO: Implpementation des notifications, push, email
+- TODO: Implementation réinitialisation mdp
+- TODO: product full ne renvoie pas les données de baker.datejoined
