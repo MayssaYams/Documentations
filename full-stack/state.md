@@ -222,6 +222,32 @@ Objectif du CTO : un seul compte reviewer Google Play, `group_id=1` (admin) côt
 
 Aucun fichier backend touché. Aucun `git add`/`commit` fait, comme demandé.
 
+### PAT-38 — Signalement (report) produits et messages, réplication du pattern review_reports (Google Play UGC policy)
+
+Réplique exactement le mécanisme déjà en prod pour les avis (`review_reports`, `review-service`) sur les produits et les messages, sur les 3 services `product-service`/`message-service`/`admin-service`.
+
+- `Documentations/database/add_product_reports.sql` (nouveau) — table `product_reports` (id UUID, `product_id` INTEGER FK→`product(id)` ON DELETE CASCADE, `reporter_user_id` FK→`accounts_user(id)`, `reason`, `status` pending/dismissed/resolved, `UNIQUE(product_id, reporter_user_id)`, index sur `status`). `product.id` confirmé SERIAL dans `03_products.sql:15`.
+- `Documentations/database/add_message_reports.sql` (nouveau) — table `message_reports`, même structure + `conversation_id` UUID dénormalisé (FK→`conversations(id)`, évite un JOIN côté admin), `message_id` FK→`messages(id)`.
+- `Backend/product-service/products/views.py` — `ProductViewSet.report` (`POST /api/products/{id}/report/`, action DRF, route auto-générée par le router existant). Ajout d'un `get_permissions()` dédié : `ProductPermission`/`ProductObjectPermission` (permission_classes par défaut du ViewSet) réservent l'écriture aux bakers/admins et auraient renvoyé 403 à un client qui signale — `report` bascule sur `IsAuthenticated` seul, toutes les autres actions gardent le comportement existant.
+- `Backend/product-service/products/unit_tests/test_views.py` — classe `TestProductReport` (4 tests : succès 201, reason manquante 400, produit introuvable 404, doublon 409), mêmes mocks `connection` que le reste du fichier.
+- `Backend/message-service/messages_app/views.py` — `MessageViewSet.report` (`POST /api/messages/{id}/report/`). Contrainte spécifique par rapport au pattern review : vérifie que l'utilisateur est participant actif de la conversation du message (même requête que `create()`), 403 sinon, avant tout accès en écriture.
+- `Backend/message-service/messages_app/tests.py` — classe `MessageReportTestCase` (5 tests : succès 201, message introuvable 404, reason manquante 400, non-participant 403, doublon 409).
+- `Backend/admin-service/admin_app/models.py` — `ProductReport` (unmanaged, `db_table='product_reports'`), `MessageReport` (idem, `db_table='message_reports'`), `Message` (nouveau modèle minimal unmanaged en lecture, `db_table='messages'`, juste ce qu'il faut pour afficher un message signalé — message-service reste seul responsable du schéma complet).
+- `Backend/admin-service/admin_app/serializers.py` — `ProductReportAdminSerializer`, `MessageReportAdminSerializer` (mirroring `ReviewReportAdminSerializer`).
+- `Backend/admin-service/admin_app/views.py` — `ProductReportAdminViewSet` (`ReadOnlyModelViewSet`, `IsAdminRole`, actions `dismiss` + `resolve`). Écart volontaire par rapport au pattern review (qui supprime l'avis) : `resolve` ne supprime PAS le produit, jugé trop destructeur — réutilise le mécanisme de flag déjà existant (`ProductAdminViewSet.flag` : `UPDATE product SET is_flagged=TRUE, flag_reason=...`). `MessageReportAdminViewSet` (même structure) : `resolve` fait un soft-delete du message signalé (`UPDATE messages SET is_deleted=TRUE, deleted_at=..., deleted_by=...`, colonnes déjà présentes sur `messages` côté message-service) — admin-service écrit dans cette table partagée à des fins de modération, pattern déjà établi (order-service au checkout).
+- `Backend/admin-service/admin_app/urls.py` — `product-reports`/`message-reports` enregistrés à côté de `review-reports`.
+- `Backend/admin-service/admin_app/tests/test_endpoints.py` — `ProductReportAdminEndpointsTests` (6 tests) et `MessageReportAdminEndpointsTests` (6 tests), même style de mock que `ReviewReportAdminEndpointsTests`.
+
+**Tests** (contre Postgres réel via tunnel SSH `myfreebox`, pas sqlite — voir §"Comment lancer les tests" ci-dessus) :
+- `product-service` : 77 tests (73 préexistants + 4 nouveaux), **10 échecs préexistants non liés** (7 failures + 3 errors, mêmes noms de tests avant/après ma tâche — `test_create_product_*`, `test_list_by_baker_*`, `test_get_images_*`, `test_retrieve_image_not_found`, `test_create_images_missing_imageurl` — documentés PAT-29, non touchés).
+- `message-service` : 34/34 (29 préexistants + 5 nouveaux), aucune régression.
+- `admin-service` : 46/46 (34 préexistants + 12 nouveaux), aucune régression.
+- `python manage.py check` : 0 erreur sur les 3 services.
+
+**SQL appliqué sur Freebox** (via tunnel `ssh -p 31456 -L 5433:127.0.0.1:5432 alvin@91.171.4.184 -N -f`, `psql` direct sur `localhost:5433`, pas de piège `$` puisque pas de shell distant impliqué) : les 2 scripts exécutés avec succès sur `mytestpatisry` (dev) **et** `test_mytestpatisry` (test). Vérifié `\d product_reports`/`\d message_reports` sur les deux bases : colonnes, index (`idx_*_status`, contrainte UNIQUE), et FK (`product`/`messages`/`conversations`/`accounts_user`) tous corrects.
+
+**Non fait, comme demandé** : aucun déploiement (pas de rebuild Docker/push), aucun commit git.
+
 ## Dernière mise à jour
 
-2026-08-06 — Compte admin Google Play voit les écrans baker : `app.dart` (gate routing `/account/dashboard`+`/account/my-pastries`), `connected_account_screen.dart` (menu "Tableau de bord"/"Mes pâtisseries" affiché, "Devenir pâtissier" masqué pour l'admin), `profile_screen.dart` (onglet/section pâtissier), `orders_screen.dart` (onglet "Commandes reçues" + choix d'API) migrés vers `AuthService.canAccessBakerFeatures`. `user_info.dart`, `order_detail_screen.dart` (piège catégorie-2 déjà géré par comparaison d'entité, non touché intentionnellement) et `order_messages_section.dart` (widget dumb) laissés inchangés. `flutter analyze` 0 erreur, `flutter build web --no-tree-shake-icons` succès. 2 écarts mineurs tranchés seul ci-dessus (masquage CTA "devenir pâtissier" pour admin ; badge identité profil laissé factuel).
+2026-08-07 — PAT-38 : signalement produits/messages répliquant `review_reports` sur `product-service`/`message-service`/`admin-service` (détail ci-dessus). Tests : 77/34/46 (10 échecs préexistants non liés dans product-service, documentés PAT-29). Scripts SQL `add_product_reports.sql`/`add_message_reports.sql` appliqués et vérifiés sur `mytestpatisry` et `test_mytestpatisry`. Pas de déploiement, pas de commit.
