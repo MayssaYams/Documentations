@@ -4,6 +4,14 @@ Voir [`role.md`](role.md) pour la mission et les repères. Ce fichier doit être
 
 ## Fait
 
+- **2026-09-09 — Lot 3 du plan PO (socle localisation, epic PAT-43) : 3 tickets livrés en PR, aucun mergé.**
+  - Choix des tickets : PAT-44, PAT-45 et PAT-48 sont les seuls de l'epic sans dépendance bloquante entre eux, et ils touchent 3 dépôts disjoints (`Documentations`, `baker-service`, `Patisry`) — donc parallélisables sans conflit. Dispatch de 3 subagents en parallèle, revue personnelle du diff avant chaque commit (pas seulement lecture des rapports).
+  - **PAT-44** (socle SQL) — [Documentations#1](https://github.com/MayssaYams/Documentations/pull/1). Point de collecte alternatif, colonnes `geography(Point,4326)` générées `STORED`, index GIST, règle « retrait effectif » matérialisée une seule fois en base, colonnes de livraison marquées DORMANTES.
+    - **Le script a été validé pour de vrai** malgré la Freebox HS : PostGIS 3.4 / PostgreSQL 15 jetable en conteneur, schéma minimal reproduisant l'existant. Mode colonne générée retenu (le repli trigger prévu par l'agent ne s'est pas déclenché), règle de retrait vérifiée dans les deux sens, contrainte `CHECK` et refus d'écriture directe confirmés, rejeu idempotent, et `EXPLAIN ANALYZE` sur **50 000 pâtissiers** : `Bitmap Index Scan` (58 ms) contre `Seq Scan` forcé (569 ms). La DoD « EXPLAIN montre l'usage de l'index GIST » est donc satisfaite, contrairement à ce que la panne laissait craindre.
+  - **PAT-45** (géocodage BAN) — [Baker-Service#1](https://github.com/MayssaYams/Baker-Service/pull/1). Module `baker_app/geocoding.py` isolé (un test échoue si quelqu'un y introduit un import de `models`/`views`/`serializers`/`storage`), exceptions typées introuvable/ambigu/timeout, cache Django, throttling 50 req/s. 35 tests mockés verts, `manage.py check` OK, diff purement additif.
+  - **PAT-48** (position Flutter) — [Patisry#22](https://github.com/MayssaYams/Patisry/pull/22). C'est le ticket qui débloque la chaîne inerte : `_userLat`/`_userLon` sont enfin alimentés. `geolocator` 13.0.4, pre-prompt avant la popup système, permissions minimales (COARSE seule / WhenInUse seule), repli manuel BAN, cache mémoire 15 min. **RGPD : aucune persistance**, vérifiée par grep sur tout le code de localisation et verrouillée par 2 tests. 15 tests verts, `analyze` 0 erreur au niveau de la baseline, `build web` OK.
+  - **Points remontés en PR, à trancher par le CTO** : plancher SDK du `pubspec.yaml` incohérent avec geolocator ≥ 13.0.3 (inerte car `publish_to: none`) ; `geolocator_android` injecte un `foregroundServiceType="location"` inutile à surveiller pour la déclaration Data Safety (rattachable à PAT-53) ; `.gitignore` de `baker-service` ignore tout `baker_app/` (piège récurrent, `git add -f` obligatoire) ; distance toujours pas affichée sur les cartes produit (`pastry_card.dart:199`, relève de PAT-50).
+
 - 2026-07-27 — Release 1.5.0 : commits développe → bundle version 1.5.0 → push staging (2 repos à la fois) → CI vérifiée → tag `1.5.0` sur les 7 repos concernés (admin-service, baker-service, display-service, order-service, review-service, user-service, Patisry). Détail dans `Documentations/devops/state.md`.
 
 - 2026-08-04 — **PAT-24 (optimisation des images) — Phase 1 livrée sur dev (Freebox), ticket Linear passé en "In Review".**
@@ -75,7 +83,11 @@ Le CDN Scaleway ne bénéficiait qu'à `baker-service` avant cette tâche (produ
 
 ## Bloqué / n'a pas pu être fait correctement
 
-_Rien pour l'instant._
+- **2026-09-09 — La Freebox est HS (problème de synchronisation RAID côté CTO).** La VM est éteinte et refuse de démarrer (« Le fichier de disque n'a pas été trouvé »). Conséquences directes, à lever dès qu'elle revient :
+  - **PAT-44** : script SQL non appliqué sur dev ni staging, et backfill de géocodage non lancé (requêtes prêtes en annexe du script). Le reste de sa DoD a pu être validé sur un PostGIS jetable.
+  - **PAT-45** : les 9 erreurs restantes de la suite `baker-service` sont des `no such table: accounts_user` dans 2 classes préexistantes non touchées, dues à l'absence de base réelle. À rejouer avec Postgres : `python manage.py test baker_app.tests -v 2`.
+  - **PAT-48** : `distance_km` non nul de bout en bout n'est pas constatable — il faut PAT-44 appliqué, les pâtissiers géocodés (PAT-46) et un backend joignable. Chemin web en HTTP non exercé dans un navigateur.
+  - **PAT-25/26/30/41** (mergés sur staging le 2026-08-26) : PAT-25 validé manuellement par le CTO, PAT-26 vérifié en conditions réelles sur `patisry.fr`. **PAT-41 (nom du client sur les commandes reçues) n'a jamais pu être testé** : il faut un compte pâtissier avec au moins une commande reçue, identifiants non disponibles.
 
 ## Questions ouvertes pour le CTO
 
@@ -87,4 +99,4 @@ _Rien pour l'instant._
 
 ## Dernière mise à jour
 
-2026-08-04 — PAT-24 Phase 1 livrée sur dev (Freebox), incident de déploiement résolu, tests verts (hors échecs préexistants documentés), ticket Linear en "In Review".
+2026-09-09 — Lot 3 du plan PO (socle localisation) : PAT-44, PAT-45 et PAT-48 livrés en PR (aucun mergé, Freebox HS). Script SQL de PAT-44 validé sur un PostGIS jetable, index GIST prouvé par EXPLAIN sur 50 000 lignes.
