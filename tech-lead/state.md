@@ -84,12 +84,14 @@ Le CDN Scaleway ne bénéficiait qu'à `baker-service` avant cette tâche (produ
 ## Bloqué / n'a pas pu être fait correctement
 
 - **2026-09-09 — La Freebox est HS (problème de synchronisation RAID côté CTO).** La VM est éteinte et refuse de démarrer (« Le fichier de disque n'a pas été trouvé »). Conséquences directes, à lever dès qu'elle revient :
-  - **PAT-44** : script SQL non appliqué sur dev ni staging, et backfill de géocodage non lancé (requêtes prêtes en annexe du script). Le reste de sa DoD a pu être validé sur un PostGIS jetable.
+  - **PAT-44** : script SQL non encore appliqué sur **staging** (seule cible retenue depuis que le CTO a acté d'abandonner la Freebox), et backfill de géocodage non lancé (requêtes prêtes en annexe du script). Le reste de sa DoD a pu être validé sur un PostGIS jetable. L'application n'attend qu'un feu vert : c'est une mutation de schéma sur un environnement partagé, je ne l'ai pas lancée de moi-même.
   - **PAT-45** : les 9 erreurs restantes de la suite `baker-service` sont des `no such table: accounts_user` dans 2 classes préexistantes non touchées, dues à l'absence de base réelle. À rejouer avec Postgres : `python manage.py test baker_app.tests -v 2`.
   - **PAT-48** : `distance_km` non nul de bout en bout n'est pas constatable — il faut PAT-44 appliqué, les pâtissiers géocodés (PAT-46) et un backend joignable. Chemin web en HTTP non exercé dans un navigateur.
   - **PAT-25/26/30/41** (mergés sur staging le 2026-08-26) : PAT-25 validé manuellement par le CTO, PAT-26 vérifié en conditions réelles sur `patisry.fr`. **PAT-41 (nom du client sur les commandes reçues) n'a jamais pu être testé** : il faut un compte pâtissier avec au moins une commande reçue, identifiants non disponibles.
 
 ## Questions ouvertes pour le CTO
+
+- **2026-09-09 — Abandon de la Freebox : conséquence à trancher.** Le CTO a acté de ne plus considérer la Freebox (RAID HS). PAT-44 a été recadré sur staging seul, mais l'abandon a une conséquence plus large non traitée : `Patisry/lib/core/config/app_config.dart` résout `Environment.freebox` **par défaut** (`String.fromEnvironment('ENVIRONMENT', defaultValue: 'freebox')`). Autrement dit, tout `flutter run` / `flutter build` lancé sans `--dart-define=ENVIRONMENT=staging` pointe aujourd'hui vers une machine morte — c'est très probablement ce qui a produit le « rien ne fonctionne » constaté avant qu'on identifie la panne. Deux options : basculer le défaut sur `staging`, ou garder `freebox` et documenter le dart-define comme obligatoire. `CLAUDE.md` (tableau des 3 environnements, ports Freebox, section Contacts) décrit aussi encore la Freebox comme l'environnement de dev — à mettre à jour dans la foulée de la décision. Pas touché de moi-même : ça change le comportement par défaut de toute l'équipe.
 
 - **PAT-24 reste en "In Review", pas "Done"** : Phase 1 validée sur dev (Freebox) uniquement, pas encore sur staging (règle projet : "une feature n'est livrée que validée sur staging"). Prioriser le déploiement staging maintenant, ou attendre le prochain cycle de release groupé ?
 - Une découverte hors scope pendant PAT-24, encore ouverte :
