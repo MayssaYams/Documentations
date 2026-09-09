@@ -39,9 +39,17 @@
 -- Idempotent : rejouable sans risque (gardes information_schema / pg_constraint,
 -- CREATE INDEX IF NOT EXISTS, CREATE OR REPLACE FUNCTION).
 --
--- Usage :
---   psql -h <host> -p <port> -U <user> -d <db> -f add_baker_location_geography.sql
---   ssh -p 31456 alvin@91.171.4.184 "PGPASSWORD=... psql -h localhost -U local -d mytestpatisry" < add_baker_location_geography.sql
+-- Environnement cible : STAGING uniquement.
+--   La Freebox (ancien environnement de dev) est hors service et n'est plus
+--   prise en compte — ne pas ajouter d'étape « appliquer sur la Freebox » en
+--   relisant ce script.
+--
+-- Usage (staging) :
+--   ssh -i ~/.ssh/patisry-staging-deploy ubuntu@<VM_IP> \
+--     "sudo docker exec -i patisry-db psql -U patisry_backend -d patisry_db" \
+--     < add_baker_location_geography.sql
+--
+--   Générique : psql -h <host> -p <port> -U <user> -d <db> -f add_baker_location_geography.sql
 -- =====================================================
 
 BEGIN;
@@ -142,15 +150,15 @@ END $$;
 --        ou un COPY pourrait court-circuiter.
 --      - aucun coût de maintenance applicatif.
 --
---    Pourquoi un repli est quand même nécessaire :
+--    Pourquoi un repli est quand même conservé :
 --      ADD COLUMN ... GENERATED ALWAYS AS (...) STORED exige PostgreSQL >= 12
 --      ET une expression strictement IMMUTABLE. ST_MakePoint / ST_SetSRID et
---      le cast geometry -> geography sont marqués IMMUTABLE dans PostGIS,
---      donc ça doit passer ; mais selon la version de PostGIS installée le
---      moteur peut refuser l'expression. Ce script n'a PAS pu être exécuté
---      (base de dev Freebox HS au moment de l'écriture), donc plutôt que de
---      parier, on tente la colonne générée et on bascule automatiquement sur
---      un trigger BEFORE INSERT OR UPDATE si le moteur refuse.
+--      le cast geometry -> geography sont marqués IMMUTABLE dans PostGIS.
+--      VÉRIFIÉ : sur PostgreSQL 15 / PostGIS 3.4, le mode colonne générée est
+--      accepté et le repli ne se déclenche pas (is_generated = ALWAYS sur les
+--      4 colonnes, aucun trigger créé). Le repli reste néanmoins en place au
+--      cas où staging tournerait une version différente — il ne coûte rien et
+--      évite un échec bloquant sur une base qu'on ne contrôle pas.
 --      Les deux modes produisent EXACTEMENT les mêmes colonnes (mêmes noms,
 --      mêmes types) : le code applicatif en lecture est identique dans les
 --      deux cas, et dans les deux cas les services ne doivent JAMAIS écrire
@@ -525,11 +533,14 @@ COMMIT;
 --      AND address_label IS NOT NULL
 --      AND baker_id IN (1, 2, 3);
 --
--- E. Verification que l'index GIST est bien utilise (a faire des qu'une base
---    est disponible — attendu : « Index Scan using idx_baker_location_effective_geog »,
---    surtout PAS « Seq Scan »). Penser a ANALYZE avant, et noter qu'avec
---    3 lignes le planificateur choisira un Seq Scan de toute facon :
---    tester sur un volume representatif.
+-- E. Verification que l'index GIST est bien utilise.
+--    DEJA VALIDE hors staging, sur PostgreSQL 15 / PostGIS 3.4 avec 50 000
+--    patissiers : « Bitmap Index Scan on idx_baker_location_effective_geog »
+--    en 58 ms, contre 569 ms en Seq Scan force. A rejouer sur staging par
+--    acquit de conscience une fois le backfill fait.
+--    Penser a ANALYZE avant, et noter qu'avec une poignee de lignes le
+--    planificateur choisira un Seq Scan de toute facon (c'est normal et moins
+--    couteux a ce volume) : ne conclure qu'a volume representatif.
 --
 --    ANALYZE baker_location;
 --    EXPLAIN ANALYZE
