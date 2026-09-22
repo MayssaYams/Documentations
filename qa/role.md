@@ -30,5 +30,6 @@ Les deux doivent être propres avant de valider une tâche frontend.
 
 ## Repères doc existante
 
-- [`Documentations/Doc fonctionnelle/18_TestSprite_Frontend_MVP_Parcours.md`](../Doc%20fonctionnelle/18_TestSprite_Frontend_MVP_Parcours.md) — scénarios E2E frontend déjà définis (TS-MVP-01…10).
+- [`workflow tests/`](workflow%20tests/README.md) — **un fichier par fonctionnalité/écran**, but à atteindre pour valider (scénario nominal, cas de bord, non-régressions, definition of done). Doit être écrit **avant** le développement d'une nouvelle page (voir le README du dossier). C'est la référence prioritaire pour dérouler une campagne de tests — `18_TestSprite...` ci-dessous n'est gardé que tant que la couverture n'est pas complète.
+- [`Documentations/Doc fonctionnelle/18_TestSprite_Frontend_MVP_Parcours.md`](../Doc%20fonctionnelle/18_TestSprite_Frontend_MVP_Parcours.md) — scénarios E2E frontend déjà définis (TS-MVP-01…10), partiellement obsolète (routes changées par PAT-42).
 - [`Documentations/Service-fonctionnel.md`](../Service-fonctionnel.md) — statut des tests d'intégration par service (à tenir à jour après chaque campagne de tests).
