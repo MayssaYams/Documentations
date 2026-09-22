@@ -30,25 +30,25 @@ Un fichier par ligne. Statuts : 🔲 à rédiger, 🟡 en écriture, ✅ rédig�
 
 | Fichier | Écrans couverts | Statut |
 |---|---|---|
-| `commande-et-paiement/panier-et-validation-commande.md` | `cart_screen`, `payment_screen`, `payment_confirmation_screen` | 🔲 |
-| `commande-et-paiement/moyens-de-paiement.md` | `payment_methods_screen`, `add_card_screen`, `edit_card_screen`, `apple_pay_screen`, `google_pay_screen`, `paypal_screen` | 🔲 |
-| `commande-et-paiement/cycle-de-vie-commande.md` | `orders_screen`, `order_detail_screen`, `ready_dialogs` | 🔲 |
-| `commande-et-paiement/messages.md` | `messages_screen`, `conversation_screen` | 🔲 |
-| `commande-et-paiement/avis.md` | `reviews_screen`, `write_review_screen` | 🔲 |
+| `commande-et-paiement/panier-et-validation-commande.md` | `cart_screen`, `payment_screen`, `payment_confirmation_screen` | ✅ |
+| `commande-et-paiement/moyens-de-paiement.md` | `payment_methods_screen`, `add_card_screen`, `edit_card_screen`, `apple_pay_screen`, `google_pay_screen`, `paypal_screen` | ✅ |
+| `commande-et-paiement/cycle-de-vie-commande.md` | `orders_screen`, `order_detail_screen`, `ready_dialogs` | ✅ |
+| `commande-et-paiement/messages.md` | `messages_screen`, `conversation_screen` | ✅ |
+| `commande-et-paiement/avis.md` | `reviews_screen`, `write_review_screen` | ✅ |
 
 ## patissier/
 
 | Fichier | Écrans couverts | Statut |
 |---|---|---|
-| `patissier/adresse-et-position.md` | `baker_address_screen` (PAT-74/75/76) | 🔲 |
-| `patissier/bascule-baker-client.md` | `edit_baker_info_screen`, downgrade/upgrade (CLAUDE.md §Règles métier) | 🔲 |
+| `patissier/adresse-et-position.md` | `baker_address_screen` (PAT-74/75/76) | ✅ |
+| `patissier/bascule-baker-client.md` | `edit_baker_info_screen`, downgrade/upgrade (CLAUDE.md §Règles métier) | ✅ |
 
 ## transverse/
 
 | Fichier | Portée | Statut |
 |---|---|---|
-| `transverse/navigation-retour-systeme.md` | Tout l'app — bouton retour, `go`/`push` (PAT-42) | 🔲 |
-| `transverse/localisation-memorisation.md` | Tout l'app — mode GPS/ville mémorisé (PAT-77), `location_chip`, `location_flow`, `manual_location_sheet` | 🔲 |
+| `transverse/navigation-retour-systeme.md` | Tout l'app — bouton retour, `go`/`push` (PAT-42) | 🔁 (PR non mergée, non testée device) |
+| `transverse/localisation-memorisation.md` | Tout l'app — mode GPS/ville mémorisé (PAT-77), `location_chip`, `location_flow`, `manual_location_sheet` | 🔁 (raffinement en cours) |
 
 ## admin/
 
