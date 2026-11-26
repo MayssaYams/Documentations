@@ -8,23 +8,23 @@ Un fichier par ligne. Statuts : 🔲 à rédiger, 🟡 en écriture, ✅ rédig�
 
 | Fichier | Écrans couverts | Statut |
 |---|---|---|
-| `compte/inscription.md` | `register_screen`, `email_verification_screen` | 🔲 |
-| `compte/connexion-et-mot-de-passe-oublie.md` | `login_screen`, `forgot_password_screen` | 🔲 |
-| `compte/profil-client.md` | `connected_account_screen`, `edit_personal_info_screen`, `profile_screen` | 🔲 |
-| `compte/suppression-compte-rgpd.md` | `account_deletion_screen` | 🔲 |
-| `compte/pages-legales-et-consentement.md` | `legal_notice_screen`, `analytics_consent_dialog` | 🔲 |
+| `compte/inscription.md` | `register_screen`, `email_verification_screen` | ✅ |
+| `compte/connexion-et-mot-de-passe-oublie.md` | `login_screen`, `forgot_password_screen` | ✅ |
+| `compte/profil-client.md` | `connected_account_screen`, `edit_personal_info_screen`, `profile_screen` | ✅ |
+| `compte/suppression-compte-rgpd.md` | `account_deletion_screen` | ✅ |
+| `compte/pages-legales-et-consentement.md` | `legal_notice_screen`, `analytics_consent_dialog` | ✅ |
 
 ## catalogue/
 
 | Fichier | Écrans couverts | Statut |
 |---|---|---|
-| `catalogue/accueil.md` | `home_screen` (hors localisation, voir `transverse/localisation-memorisation.md`) | 🔲 |
-| `catalogue/recherche.md` | feature `search` | 🔲 |
-| `catalogue/fiche-produit.md` | `product_screen` | 🔲 |
-| `catalogue/fiche-patissier-publique.md` | `baker_profile_screen` | 🔲 |
-| `catalogue/favoris.md` | `favorites_screen`, `favorite_group_detail_screen` (+ note code mort `favorite_screen.dart`, cf. PAT-80) | 🔲 |
-| `catalogue/mes-patisseries.md` | `my_pastries_screen`, `edit_pastry_screen` | 🔲 |
-| `catalogue/notifications.md` | `notifications_screen` + notifications push (tap → deep link, cf. PAT-42 non testé sur device) | 🔲 |
+| `catalogue/accueil.md` | `home_screen` (hors localisation, voir `transverse/localisation-memorisation.md`) | ✅ |
+| `catalogue/recherche.md` | feature `search` | ✅ |
+| `catalogue/fiche-produit.md` | `product_screen` | ✅ |
+| `catalogue/fiche-patissier-publique.md` | `baker_profile_screen` | ✅ |
+| `catalogue/favoris.md` | `favorites_screen`, `favorite_group_detail_screen` (+ note code mort `favorite_screen.dart`, cf. PAT-80) | ✅ |
+| `catalogue/mes-patisseries.md` | `my_pastries_screen`, `edit_pastry_screen` | ✅ |
+| `catalogue/notifications.md` | `notifications_screen` + notifications push (tap → deep link, cf. PAT-42 non testé sur device) | ✅ |
 
 ## commande-et-paiement/
 
@@ -54,13 +54,13 @@ Un fichier par ligne. Statuts : 🔲 à rédiger, 🟡 en écriture, ✅ rédig�
 
 | Fichier | Écrans couverts | Statut |
 |---|---|---|
-| `admin/dashboard-et-analytics.md` | `admin_dashboard_screen`, `admin_analytics_screen` | 🔲 |
-| `admin/baker-et-produits.md` | `admin_bakers_screen`, `admin_products_screen` | 🔲 |
-| `admin/utilisateurs-et-audit.md` | `admin_users_screen`, `admin_audit_log_screen` | 🔲 |
-| `admin/moderation-avis.md` | `admin_review_reports_screen` | 🔲 |
-| `admin/referentiels.md` | `admin_allergens_screen`, `admin_categories_screen`, `admin_size_options_screen` | 🔲 |
-| `admin/communication.md` | `admin_newsletter_screen`, `admin_push_screen` | 🔲 |
-| `admin/parametres.md` | `admin_settings_screen` | 🔲 |
+| `admin/dashboard-et-analytics.md` | `admin_dashboard_screen`, `admin_analytics_screen` | ✅ |
+| `admin/baker-et-produits.md` | `admin_bakers_screen`, `admin_products_screen` | ✅ |
+| `admin/utilisateurs-et-audit.md` | `admin_users_screen`, `admin_audit_log_screen` | ✅ |
+| `admin/moderation-avis.md` | `admin_review_reports_screen` | ✅ |
+| `admin/referentiels.md` | `admin_allergens_screen`, `admin_categories_screen`, `admin_size_options_screen` | ✅ |
+| `admin/communication.md` | `admin_newsletter_screen`, `admin_push_screen` | ✅ |
+| `admin/parametres.md` | `admin_settings_screen` | ✅ |
 
 ## Hors périmètre pour l'instant (pas d'écran ou dormant)
 
