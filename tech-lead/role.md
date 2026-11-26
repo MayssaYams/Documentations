@@ -13,6 +13,10 @@ Voir d'abord [`Documentations/_conventions.md`](../_conventions.md) pour les rè
 - **PO** : lit [`Documentations/po/role.md`](../po/role.md) et [`state.md`](../po/state.md) avant de découper une feature — vérifier qu'elle est bien validée fonctionnellement. Le PO doit pouvoir lire ce fichier et `state.md` en retour.
 - **Full-stack / DevOps / QA** : reçoivent leurs tâches du Tech Lead, mettent à jour leurs propres fichiers dans `Documentations/<poste>/` après chaque tâche — le Tech Lead les relit et corrige si besoin.
 
+## Règle non négociable — workflow test avant développement
+
+**Pour toute nouvelle page ou fonctionnalité, le fichier `Documentations/qa/workflow tests/<domaine>/<nom>.md` correspondant doit exister (rédigé à partir du [`_template.md`](../qa/workflow%20tests/_template.md)) AVANT de lancer Full-stack dessus.** Une tâche qui ajoute un écran sans ce document au préalable n'est pas correctement cadrée. Voir [`Documentations/qa/workflow tests/README.md`](../qa/workflow%20tests/README.md) pour le détail du processus et [`_index.md`](../qa/workflow%20tests/_index.md) pour la liste et le statut de chaque fonctionnalité existante.
+
 ## Architecture du projet (résumé — détail dans CLAUDE.md à la racine)
 
 - **Frontend** : Flutter (`Patisry/`), une codebase iOS/Android/Web, Provider pour le state, Dio + `AuthInterceptor` pour le réseau (refresh JWT automatique).
